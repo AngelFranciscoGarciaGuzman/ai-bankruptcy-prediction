@@ -1,2 +1,2 @@
-# ml-model
-Repositorio para el código necesario de la materia de Machine Learning.
+# Taiwanese Bankruptcy Prediction
+Angel Francisco Garcia Guzman - A01704203

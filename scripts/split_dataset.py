@@ -1,5 +1,6 @@
 from pathlib import Path
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_CSV = PROJECT_ROOT / "original-dataset" / "data.csv"
@@ -7,17 +8,27 @@ OUTPUT_DIR = PROJECT_ROOT / "split-dataset"
 TRAIN_DIR = OUTPUT_DIR / "train"
 TEST_DIR = OUTPUT_DIR / "test"
 
+TARGET_COL = "Bankrupt?"
 TEST_SIZE = 0.20
 RANDOM_STATE = 42
+
+
+def class_stats(series: pd.Series) -> str:
+    counts = series.value_counts().sort_index()
+    total = len(series)
+    parts = [f"{label}={count} ({count / total:.2%})" for label, count in counts.items()]
+    return ", ".join(parts)
 
 
 def main() -> None:
     df = pd.read_csv(SOURCE_CSV)
 
-    shuffled = df.sample(frac=1.0, random_state=RANDOM_STATE).reset_index(drop=True)
-    n_test = int(round(len(shuffled) * TEST_SIZE))
-    test_df = shuffled.iloc[:n_test]
-    train_df = shuffled.iloc[n_test:]
+    train_df, test_df = train_test_split(
+        df,
+        test_size=TEST_SIZE,
+        random_state=RANDOM_STATE,
+        stratify=df[TARGET_COL],
+    )
 
     TRAIN_DIR.mkdir(parents=True, exist_ok=True)
     TEST_DIR.mkdir(parents=True, exist_ok=True)
@@ -28,8 +39,11 @@ def main() -> None:
     test_df.to_csv(test_path, index=False)
 
     print(f"Total filas: {len(df)}")
+    print(f"  Distribucion total -> {class_stats(df[TARGET_COL])}")
     print(f"Train: {len(train_df)} filas -> {train_path.relative_to(PROJECT_ROOT)}")
+    print(f"  Distribucion train -> {class_stats(train_df[TARGET_COL])}")
     print(f"Test:  {len(test_df)} filas -> {test_path.relative_to(PROJECT_ROOT)}")
+    print(f"  Distribucion test  -> {class_stats(test_df[TARGET_COL])}")
 
 
 if __name__ == "__main__":

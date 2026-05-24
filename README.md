@@ -25,4 +25,4 @@ Los resultados del análisis exploratorio de datos pueden encontrarse en el arch
 
 El notebook utilizado para el preprocesamiento se encuentra en `notebooks/preprocessing.ipynb`.
 
-Los resultados del preprocesamiento pueden encontrarse en la carpeta `/preprocessed`.
+Los resultados del preprocesamiento pueden encontrarse en la carpeta `split-dataset/preprocessed`.

@@ -1,0 +1,30 @@
+# Predicción de Bancarrota en Empresas Taiwanesas
+# Dependencias del proyecto (Python 3.12+)
+#
+# Instalación:
+#   python -m venv .venv
+#   .\.venv\Scripts\activate    (Windows)  o   source .venv/bin/activate (Linux/Mac)
+#   pip install -r requirements.txt
+
+# Manipulación y análisis de datos
+numpy>=2.1.3
+pandas>=2.2.3
+scipy>=1.17.0
+
+# Visualización
+matplotlib>=3.10.0
+seaborn>=0.13.2
+
+# ML clásico: preprocesamiento (RobustScaler, QuantileTransformer, PCA), métricas y split estratificado
+scikit-learn>=1.8.0
+joblib>=1.4.0
+
+# Manejo de desbalance de clases (SMOTE-ENN)
+imbalanced-learn>=0.13.0
+
+# Red neuronal (Keras 3 viene integrado en TensorFlow >= 2.16)
+tensorflow>=2.18.0
+
+# Jupyter (para correr los notebooks)
+jupyter>=1.0.0
+ipykernel>=6.29.0

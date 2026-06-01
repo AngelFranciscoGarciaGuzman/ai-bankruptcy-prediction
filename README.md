@@ -150,9 +150,74 @@ Como punto de comparación tomamos el paper de Pham et al. (2025), que aplicó S
 
 **Tabla 4.** F1-score reportado por Pham et al. (2025), con y sin balanceo de clases.
 
-Lo que esta tabla nos dice es clave. Primero, los modelos sin manejo del desbalance son inútiles para este problema: F1-scores muy bajos y recalls cercanos a cero. Esto confirma que no podemos saltarnos la etapa de manejo del desbalance. Segundo, con un pipeline avanzado (resampling SMOTE-ENN, feature selection con Binary PSO y hyperparameter tuning) se pueden alcanzar F1 superiores a 0.95 con las tres arquitecturas.
+Los modelos sin manejo del desbalance son inútiles para este problema: F1-scores muy bajos y recalls cercanos a cero. Esto confirma que no podemos saltarnos la etapa de manejo del desbalance. Segundo, con un pipeline avanzado (resampling SMOTE-ENN, feature selection con Binary PSO y hyperparameter tuning) se pueden alcanzar F1 superiores a 0.95 con las tres arquitecturas.
 
-Nuestro objetivo realista para este proyecto es alcanzar un F1 mayor a 0.90 con un pipeline más simple. Un resultado entre 0.95 y 0.98 sería competitivo con la literatura sobre este dataset.
+Nuestro objetivo realista para este proyecto es alcanzar un F1 mayor a 0.85 con un pipeline más simple. Un resultado entre 0.95 y 0.98 sería competitivo con la literatura sobre este dataset.
+
+## Modelo
+
+Para este problema implementamos una red neuronal multicapa con Keras. La capa de salida es siempre una sola neurona con activación sigmoid, porque es una clasificación binaria que devuelve la probabilidad de quiebra entre 0 y 1. La función de pérdida es `binary_crossentropy` y el optimizador es Adam.
+
+Se probaron dos arquitecturas distintas. La primera fue una propuesta inicial con dos capas ocultas (64 y 32 neuronas, activación ReLU) para tener un punto de partida razonable. La segunda replica la arquitectura ganadora del paper de Pham et al. (2025), que mediante Random Search Optimization encontró que una sola capa oculta de 30 neuronas con activación tanh daba el mejor desempeño en este mismo dataset.
+
+El notebook de entrenamiento y evaluación se encuentra en `notebooks/traning_model.ipynb`.
+
+## Resultados
+
+### Modelo inicial (red neuronal con class_weight)
+
+El primer modelo tiene dos capas ocultas con activación ReLU (64 y 32 neuronas). Para compensar el fuerte desbalance de clases (96.77 % no quiebra, 3.23 % quiebra) se usó `class_weight={0: 1.0, 1: 10.0}` durante el entrenamiento, asignándole diez veces más peso a los errores en la clase minoritaria. Se entrenó por 100 épocas con batch_size de 32 y se reservó el 20 % del train para validación.
+
+Los resultados sobre el conjunto de prueba muestran un desempeño muy bueno para la clase mayoritaria pero deficiente para la clase minoritaria, que es justamente la que importa en este problema.
+
+| Clase | Precisión | Recall | F1-score | Soporte |
+|---|---|---|---|---|
+| No quiebra (0) | 0.977 | 0.980 | 0.978 | 1320 |
+| Quiebra (1) | 0.341 | 0.318 | 0.329 | 44 |
+
+**Tabla 5.** Métricas del modelo inicial sobre el conjunto de prueba.
+
+El modelo detectó solo 14 de 44 quiebras reales, dejando 30 falsos negativos. La accuracy global de 95.8 % engaña porque está dominada por la clase mayoritaria. El F1 de la clase positiva (0.329) confirma que el `class_weight` no fue suficiente para que el modelo aprendiera bien la clase minoritaria.
+
+### Modelo mejorado (SMOTE-ENN y arquitectura del paper)
+
+Después de revisar los resultados del modelo inicial se aplicaron tres cambios principales inspirados en el paper de Pham et al. (2025).
+
+El primer cambio fue aplicar SMOTE-ENN al conjunto de entrenamiento. SMOTE genera ejemplos sintéticos de la clase minoritaria interpolando entre instancias reales hasta balancear el dataset. ENN limpia puntos ambiguos en las fronteras entre clases. La combinación produce un train balanceado con fronteras de decisión más claras. SMOTE-ENN se aplica únicamente al train, nunca al test, porque el test tiene que reflejar la proporción real de quiebras del mundo real.
+
+Para evitar contaminar la validación con muestras sintéticas, antes de aplicar SMOTE-ENN se separó un conjunto de validación interno (20 % del train original, estratificado) que se mantuvo intacto. SMOTE-ENN se aplicó solo al train interno restante. De esta forma las métricas de validación durante el entrenamiento reflejan datos reales y no muestras sintéticas que el modelo ya vio.
+
+El segundo cambio fue replicar la arquitectura ganadora del paper: una sola capa oculta de 30 neuronas con activación tanh. Es notablemente más simple que la del modelo inicial. En datasets tabulares de tamaño medio las arquitecturas más simples suelen generalizar mejor porque tienen menos capacidad para memorizar.
+
+El tercer cambio fue agregar early stopping con `patience=10` y `restore_best_weights=True`, para detener el entrenamiento automáticamente cuando la pérdida de validación deja de mejorar y conservar los mejores pesos encontrados.
+
+Los resultados sobre el conjunto de prueba muestran una mejora importante en la detección de quiebras, aunque a costa de generar más falsas alarmas.
+
+| Clase | Precisión | Recall | F1-score | Soporte |
+|---|---|---|---|---|
+| No quiebra (0) | 0.992 | 0.919 | 0.954 | 1320 |
+| Quiebra (1) | 0.241 | 0.773 | 0.368 | 44 |
+
+**Tabla 6.** Métricas del modelo mejorado sobre el conjunto de prueba.
+
+El modelo ahora detecta 34 de 44 quiebras reales, reduciendo los falsos negativos de 30 a 10. El recall de la clase positiva pasó de 0.318 a 0.773, una mejora muy significativa para este problema donde el costo de no detectar una quiebra es mucho más alto que el de generar una falsa alarma. La contraparte es que los falsos positivos subieron de 27 a 107, lo que bajó la precisión de la clase positiva.
+
+### Comparación entre los dos modelos
+
+| | Modelo inicial | Modelo mejorado |
+|---|---|---|
+| Quiebras detectadas (TP) | 14 / 44 | 34 / 44 |
+| Quiebras no detectadas (FN) | 30 | 10 |
+| Falsas alarmas (FP) | 27 | 107 |
+| Recall (Quiebra) | 0.318 | 0.773 |
+| Precisión (Quiebra) | 0.341 | 0.241 |
+| F1 (Quiebra) | 0.329 | 0.368 |
+
+**Tabla 7.** Comparación del desempeño de los dos modelos en la clase minoritaria.
+
+El modelo mejorado tiene un F1 ligeramente superior al inicial (0.368 vs 0.329), pero la mejora más relevante está en el recall. Pasamos de detectar el 32 % de las quiebras a detectar el 77 %. En el contexto de evaluación de riesgo financiero, donde los falsos negativos son mucho más costosos que las falsas alarmas, este es el trade-off que queremos. El modelo se volvió más agresivo alertando quiebras, lo cual reduce los errores graves a costa de generar más alertas que requerirán revisión manual.
+
+Sigue habiendo una distancia importante con respecto al objetivo de F1 mayor a 0.85 que nos planteamos en la sección de evaluación. Esto abre la puerta a optimizaciones adicionales en futuras iteraciones, como el ajuste del umbral de decisión, regularización mediante dropout, y la comparación contra modelos no neuronales como Random Forest o XGBoost.
 
 ## Referencias
 

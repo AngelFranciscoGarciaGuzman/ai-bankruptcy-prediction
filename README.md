@@ -219,6 +219,49 @@ El modelo mejorado tiene un F1 ligeramente superior al inicial (0.368 vs 0.329),
 
 Sigue habiendo una distancia importante con respecto al objetivo de F1 mayor a 0.85 que nos planteamos en la sección de evaluación. Esto abre la puerta a optimizaciones adicionales en futuras iteraciones, como el ajuste del umbral de decisión, regularización mediante dropout, y la comparación contra modelos no neuronales como Random Forest o XGBoost.
 
+### Curva ROC y ajuste de threshold
+
+Además de las métricas tradicionales (precision, recall, F1-score), es fundamental analizar la **curva ROC (Receiver Operating Characteristic)** y el **AUC (Área Bajo la Curva)** para evaluar la capacidad discriminativa del modelo en todos los posibles umbrales de decisión.  
+
+La curva ROC grafica la tasa de verdaderos positivos (TPR = recall) contra la tasa de falsos positivos (FPR) para diferentes thresholds. El AUC resume esta relación en un solo valor: cuanto más cercano a 1, mejor capacidad de separación entre clases.  
+
+En problemas con fuerte desbalance de clases, como la predicción de bancarrota (3.23 % de positivos), el umbral estándar de 0.5 puede no ser el más adecuado. Ajustar el threshold permite controlar el trade-off entre **recall** (sensibilidad) y **precision** (especificidad).  
+
+#### Resultados obtenidos
+
+El modelo mejorado (SMOTE-ENN + arquitectura del paper) mostró un AUC de **0.89**, confirmando buena capacidad discriminativa.  
+
+- Con el threshold estándar de 0.5:  
+  - Recall (quiebra) = 0.773  
+  - Precisión (quiebra) = 0.241  
+  - F1 (quiebra) = 0.368  
+
+- Con el threshold óptimo según el índice de Youden (≈ 0.012):  
+  - Recall (quiebra) = 1.000  
+  - Precisión (quiebra) = 0.130  
+  - F1 (quiebra) = 0.230  
+
+| Threshold | Recall (Quiebra) | Precisión (Quiebra) | F1 (Quiebra) |
+|-----------|------------------|---------------------|--------------|
+| 0.50      | 0.773            | 0.241               | 0.368        |
+| 0.012     | 1.000            | 0.130               | 0.230        |
+
+#### Interpretación
+
+El threshold bajo (0.012) convierte al modelo en un detector extremadamente sensible: logra identificar todas las quiebras reales (FN = 0), pero genera muchas falsas alarmas (precisión baja).  
+
+Este comportamiento refleja el trade-off esperado: maximizar recall a costa de precisión. En el contexto financiero, donde los falsos negativos (no detectar una quiebra) son más costosos que los falsos positivos (falsas alarmas), este ajuste puede ser preferible.  
+
+## Conclusiones
+
+El proyecto de predicción de bancarrota en empresas taiwanesas demuestra que es posible construir un modelo confiable y útil para la detección temprana de riesgos financieros. A lo largo del trabajo se evidenció la importancia de un preprocesamiento robusto, capaz de manejar outliers extremos, escalas heterogéneas y multicolinealidad, lo cual permitió estabilizar las variables y reducir la dimensionalidad sin pérdida significativa de información.  
+
+Los resultados iniciales con ponderación de clases mostraron limitaciones en la detección de quiebras, pero la incorporación de técnicas de balanceo como SMOTE-ENN mejoró sustancialmente el desempeño del modelo, reduciendo los falsos negativos de manera notable. La arquitectura más simple, inspirada en la literatura previa, ofreció una mejor capacidad de generalización que configuraciones más complejas, confirmando que en datasets tabulares de tamaño medio la simplicidad puede ser una ventaja.  
+
+El análisis de la curva ROC y el ajuste de threshold permitió observar el trade-off entre recall y precisión. Con el umbral estándar de 0.5 se alcanzó un recall de 0.773 y una precisión de 0.241, mientras que con el threshold óptimo según Youden (≈0.012) se logró un recall perfecto de 1.0, aunque con una precisión reducida de 0.13. Este hallazgo confirma que, en contextos financieros, priorizar la sensibilidad del modelo es más valioso que maximizar la precisión, ya que el costo de no detectar una quiebra es mucho mayor que el de emitir falsas alarmas.  
+
+El modelo desarrollado logra cumplir con el objetivo principal del proyecto: minimizar el riesgo de pasar por alto una quiebra real. Aunque aún existe margen para optimizar el equilibrio entre recall y precisión, los resultados obtenidos sientan las bases para soluciones confiables y escalables en el ámbito de la analítica financiera aplicada a la predicción de bancarrota.
+
 ## Referencias
 
 Liang, D., Lu, C.-C., Tsai, C.-F., & Shih, G.-A. (2020). *Taiwanese Bankruptcy Prediction* [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5004D
